@@ -1,0 +1,21 @@
+﻿  main.cpp
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(62,1): warning C4267: “初始化”: 从“size_t”转换到“GLuint”，可能丢失数据
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(65,1): warning C4312: “类型强制转换”: 从“GLuint”转换到更大的“GLvoid *”
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(68,1): warning C4267: “初始化”: 从“size_t”转换到“GLuint”，可能丢失数据
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(71,1): warning C4312: “类型强制转换”: 从“GLuint”转换到更大的“GLvoid *”
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(74,1): warning C4267: “初始化”: 从“size_t”转换到“GLuint”，可能丢失数据
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(77,1): warning C4312: “类型强制转换”: 从“GLuint”转换到更大的“GLvoid *”
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(96,1): warning C4267: “参数”: 从“size_t”转换到“GLsizei”，可能丢失数据
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(122,27): warning C4018: “<”: 有符号/无符号不匹配
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(132,31): warning C4018: “<”: 有符号/无符号不匹配
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(242,45): warning C4305: “初始化”: 从“double”到“float”截断
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(389,68): warning C4244: “+=”: 从“double”转换到“float”，可能丢失数据
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(392,73): warning C4244: “+=”: 从“double”转换到“float”，可能丢失数据
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(395,53): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
+C:\Users\damnkk\source\repos\shadowMapping\Deferred_Rendering\main.cpp(395,33): warning C4244: “参数”: 从“double”转换到“int”，可能丢失数据
+  正在生成代码
+  2 of 882 functions ( 0.2%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  已完成代码的生成
+  Deferred_Rendering.vcxproj -> C:\Users\damnkk\source\repos\shadowMapping\x64\Release\Deferred_Rendering.exe

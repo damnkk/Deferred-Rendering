@@ -7,3 +7,7 @@
 <div align="center">4.normal vector(buttom&right)</div>
 <div align="center">5.shadow texture(mid)</div>
 <div align="center"><img src="asset/debug.PNG" width="512"></div>
+
+<div align="center">garbage toon rendering implemented by blinn phong</div>
+<div align="center"><img src="asset/3to2.gif" width="512"></div>
+<div align="center"><img src="asset/outline.PNG" width="512"></div>

@@ -1,11 +1,13 @@
 // std c++
 #include <iostream>
+#include<iomanip>
 #include <string>
 #include <fstream>
 #include <vector>
 #include <map>
 #include <sstream>
 #include <iostream>
+#include<ctime>
 
 // glew glut
 #include <GL/glew.h>
@@ -108,7 +110,7 @@ public:
     void load(std::string filepath)
     {
         Assimp::Importer import;
-        const aiScene* scene = import.ReadFile(filepath, aiProcess_Triangulate | aiProcess_FlipUVs);
+        const aiScene* scene = import.ReadFile(filepath, aiProcess_Triangulate | aiProcess_FlipUVs| aiProcess_GenSmoothNormals);
         // 异常处理
         if (!scene || scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
         {
@@ -280,13 +282,14 @@ GLuint skyboxProgram;   // 天空盒绘制
 // 纹理
 GLuint skyboxTexture;   // 天空盒
 GLuint shadowTexture;   // 阴影纹理
+GLuint noisetex;//云朵噪声纹理
 
 // 相机
 Camera camera;          // 正常渲染
 Camera shadowCamera;    // 从光源方向渲染
 
 // 光源与阴影参数
-int shadowMapResolution = 1024;             // 阴影贴图分辨率
+int shadowMapResolution = 4096;             // 阴影贴图分辨率
 GLuint shadowMapFBO;                        // 从光源方向进行渲染的帧缓冲
 
 // glut与交互相关变量
@@ -301,6 +304,8 @@ GLuint gcolor;      // 基本颜色纹理
 GLuint gdepth;      // 深度纹理
 GLuint gworldpos;   // 世界坐标纹理
 GLuint gnormal;     // 法线纹理
+GLuint gviewnormal;
+GLuint gviewPos;
 
 // 后处理阶段
 GLuint composite0;
@@ -416,7 +421,7 @@ void keyboardUpSpecial(int key, int x, int y)
 // 根据键盘状态判断移动
 void move()
 {
-    float cameraSpeed = 0.0035f;
+    float cameraSpeed = 0.0095f;
     // 相机控制
     if (keyboardState['w']) camera.position += cameraSpeed * camera.direction;
     if (keyboardState['s']) camera.position -= cameraSpeed * camera.direction;
@@ -425,10 +430,10 @@ void move()
     if (keyboardState[GLUT_KEY_CTRL_L]) camera.position.y -= cameraSpeed;
     if (keyboardState[' ']) camera.position.y += cameraSpeed;
     // 光源位置控制
-    if (keyboardState[GLUT_KEY_RIGHT]) shadowCamera.position.x += cameraSpeed;
-    if (keyboardState[GLUT_KEY_LEFT]) shadowCamera.position.x -= cameraSpeed;
-    if (keyboardState[GLUT_KEY_UP]) shadowCamera.position.y += cameraSpeed;
-    if (keyboardState[GLUT_KEY_DOWN]) shadowCamera.position.y -= cameraSpeed;
+    if (keyboardState['l']) shadowCamera.position.x += cameraSpeed*8;
+    if (keyboardState['j']) shadowCamera.position.x -=  cameraSpeed*8 ;
+    if (keyboardState['i']) shadowCamera.position.y += cameraSpeed*8;
+    if (keyboardState['k']) shadowCamera.position.y -= cameraSpeed*8;
     glutPostRedisplay();    // 重绘
 }
 
@@ -466,7 +471,7 @@ void init()
     // 生成着色器程序对象
     gbufferProgram = getShaderProgram("shaders/gbuffer.fsh", "shaders/gbuffer.vsh");
     shadowProgram = getShaderProgram("shaders/shadow.fsh", "shaders/shadow.vsh");
-    //debugProgram = getShaderProgram("shaders/debug.fsh", "shaders/debug.vsh");
+    debugProgram = getShaderProgram("shaders/debug.fsh", "shaders/debug.vsh");
     skyboxProgram = getShaderProgram("shaders/skybox.fsh", "shaders/skybox.vsh");
     composite0 = getShaderProgram("shaders/composite0.fsh", "shaders/composite0.vsh");
 
@@ -474,9 +479,9 @@ void init()
 
     // 读取 obj 模型
     Model tree1 = Model();
-    tree1.translate = glm::vec3(2.5, 0, 2);
-    tree1.scale = glm::vec3(0.0025, 0.0025, 0.0025);
-    tree1.load("models/tree/tree02.obj");
+    tree1.translate = glm::vec3(2.5,0, -2.0);
+    tree1.scale = glm::vec3(0.25,0.25, 0.25);
+    tree1.load("models/nanosuit/nanosuit.obj");
     models.push_back(tree1);
 
     Model tree2 = Model();
@@ -543,11 +548,11 @@ void init()
     // ------------------------------------------------------------------------ // 
 
     // 正交投影参数配置 -- 视界体范围 -- 调整到场景一般大小即可
-    shadowCamera.left = -30;
-    shadowCamera.right = 30;
-    shadowCamera.bottom = -30;
-    shadowCamera.top = 30;
-    shadowCamera.position = glm::vec3(0, 4, 15);
+    shadowCamera.left = -40;
+    shadowCamera.right = 40;
+    shadowCamera.bottom = -40;
+    shadowCamera.top = 40;
+    shadowCamera.position = glm::vec3(0, 4, 20);
 
     // 创建shadow帧缓冲
     glGenFramebuffers(1, &shadowMapFBO);
@@ -605,6 +610,26 @@ void init()
     // 将世界坐标纹理绑定到 2 号颜色附件
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gworldpos, 0);
 
+    glGenTextures(1, &gviewPos);
+    glBindTexture(GL_TEXTURE_2D, gviewPos);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, windowWidth, windowHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // 将摄像机坐标纹理绑定到 3 号颜色附件
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, gviewPos, 0);
+
+    glGenTextures(1, &gviewnormal);
+    glBindTexture(GL_TEXTURE_2D, gviewnormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, windowWidth, windowHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // 将摄像机法线纹理绑定到 4 号颜色附件
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D, gviewnormal, 0);
+
     // 创建深度纹理
     glGenTextures(1, &gdepth);
     glBindTexture(GL_TEXTURE_2D, gdepth);
@@ -616,9 +641,20 @@ void init()
     // 将深度纹理绑定到深度附件
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, gdepth, 0);
 
+    glGenTextures(1, &noisetex);
+    glBindTexture(GL_TEXTURE_2D, noisetex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    int textureWidth, textureHeight;
+    unsigned char* image = SOIL_load_image("textures/noisetex.png", &textureWidth, &textureHeight, 0, SOIL_LOAD_RGB);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, textureWidth, textureHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+    
+
     // 指定附件索引
-    GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
-    glDrawBuffers(3, attachments);
+    GLuint attachments[5] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 , GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4 };
+    glDrawBuffers(5, attachments);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);	// 解绑
 
     // ------------------------------------------------------------------------ // 
@@ -628,8 +664,18 @@ void init()
 }
 
 // 显示回调函数
+
+clock_t t1, t2;
+double dt, fps;
 void display()
 {
+
+    t2 = clock();
+    dt = (double)(t2 - t1) / CLOCKS_PER_SEC;
+    fps = 1.0 / dt;
+    std::cout << "\r";
+    std::cout << std::fixed << std::setprecision(2) << fps;
+    t1 = t2;
     move(); // 移动控制 -- 控制相机位置
 
     // 最后一个物体作为光源位置的标志物
@@ -700,16 +746,18 @@ void display()
     {
         m.draw(gbufferProgram);
     }
+    
+
 
     // ------------------------------------------------------------------------ // 
-
-    // 后处理阶段： composite0 着色器进行渲染
+    
+     //后处理阶段： composite0 着色器进行渲染
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glDisable(GL_DEPTH_TEST);
     glUseProgram(composite0);
     glViewport(0, 0, windowWidth, windowHeight);
 
-    // 传递 zfar 和 znear 方便转线性深度
+     //传递 zfar 和 znear 方便转线性深度
     glUniform1f(glGetUniformLocation(composite0, "near"), camera.zNear);
     glUniform1f(glGetUniformLocation(composite0, "far"), camera.zFar);
 
@@ -717,11 +765,11 @@ void display()
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, gcolor);
     glUniform1i(glGetUniformLocation(composite0, "gcolor"), 1);
-    // 传 gnormal 纹理
+     //传 gnormal 纹理
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, gnormal);
     glUniform1i(glGetUniformLocation(composite0, "gnormal"), 2);
-    // 传 gworldpos 纹理
+     //传 gworldpos 纹理
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, gworldpos);
     glUniform1i(glGetUniformLocation(composite0, "gworldpos"), 3);
@@ -729,63 +777,76 @@ void display()
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, gdepth);
     glUniform1i(glGetUniformLocation(composite0, "gdepth"), 4);
-    // 传阴影深度纹理
+     //传阴影深度纹理
     glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_2D, shadowTexture);
     glUniform1i(glGetUniformLocation(composite0, "shadowtex"), 5);
+
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, noisetex);
+    glUniform1i(glGetUniformLocation(composite0, "noisetex"), 6);
+
+    glUniform1f(glGetUniformLocation(composite0, "u_time"), (float)t1/CLOCKS_PER_SEC);
+
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, skyboxTexture);
+    glUniform1i(glGetUniformLocation(composite0, "skybox"), 7);
     
 
     // 传递矩阵: 转换到光源坐标的变换矩阵
     glm::mat4 shadowVP = shadowCamera.getProjectionMatrix(false) * shadowCamera.getViewMatrix(false);
     glUniformMatrix4fv(glGetUniformLocation(composite0, "shadowVP"), 1, GL_FALSE, glm::value_ptr(shadowVP));
 
-    // 传递光源位置
+     //传递光源位置
     glUniform3fv(glGetUniformLocation(composite0, "lightPos"), 1, glm::value_ptr(shadowCamera.position));
     // 传递相机位置
     glUniform3fv(glGetUniformLocation(composite0, "cameraPos"), 1, glm::value_ptr(camera.position));
 
-    // 绘制
+     //绘制
     screen.draw(composite0);
     glEnable(GL_DEPTH_TEST);
-
+    
     // ------------------------------------------------------------------------ // 
-
-    /*
-    // debug着色器输出一个四方形以显示纹理中的数据
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glDisable(GL_DEPTH_TEST);   // 需要取消深度测试以保证其覆盖在原画面上
+        
+    /*glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDisable(GL_DEPTH_TEST);
     glUseProgram(debugProgram);
     glViewport(0, 0, windowWidth, windowHeight);
 
-    // 传递 zfar 和 znear 方便转线性深度
     glUniform1f(glGetUniformLocation(debugProgram, "near"), camera.zNear);
     glUniform1f(glGetUniformLocation(debugProgram, "far"), camera.zFar);
 
-    // 传 gcolor 纹理
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, gcolor);
     glUniform1i(glGetUniformLocation(debugProgram, "gcolor"), 1);
-    // 传 gnormal 纹理
+
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, gnormal);
     glUniform1i(glGetUniformLocation(debugProgram, "gnormal"), 2);
-    // 传 gworldpos 纹理
+
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, gworldpos);
     glUniform1i(glGetUniformLocation(debugProgram, "gworldpos"), 3);
-    // 传 gdepth 纹理
+
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, gdepth);
     glUniform1i(glGetUniformLocation(debugProgram, "gdepth"), 4);
-    // 传阴影深度纹理
+
     glActiveTexture(GL_TEXTURE5);
     glBindTexture(GL_TEXTURE_2D, shadowTexture);
-    glUniform1i(glGetUniformLocation(debugProgram, "shadowtex"), 5);
+    glUniform1i(glGetUniformLocation(debugProgram, "shadowTexture"), 5);
 
-    // 绘制
+    glActiveTexture(GL_TEXTURE6);
+    glBindTexture(GL_TEXTURE_2D, gviewnormal);
+    glUniform1i(glGetUniformLocation(debugProgram, "viewnormal"), 6);
+
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_2D, gviewPos);
+    glUniform1i(glGetUniformLocation(debugProgram, "viewpos"), 7);
+
     screen.draw(debugProgram);
     glEnable(GL_DEPTH_TEST);
-    */
+        */
 
     // ------------------------------------------------------------------------ // 
 

@@ -7,6 +7,8 @@ layout (location = 2) in vec3 vNormal;
 out vec3 normal;
 out vec2 texcoord;
 out vec3 worldPos;
+out vec3 viewPos;
+out vec3 viewnormal;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -18,4 +20,7 @@ void main()
     texcoord = vTexcoord;
     worldPos = (model*vec4(vPosition,1.0)).xyz;
     normal = (model*vec4(vNormal,0.0)).xyz;
+    viewPos = (view*model*vec4(vPosition,1.0)).xyz;
+    viewnormal = (view*model*vec4(vNormal,0.0)).xyz;
+
 }
